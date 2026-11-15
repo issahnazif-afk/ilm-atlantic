@@ -2,8 +2,8 @@
 // Objective tasks use the published PTE marking rules exactly.
 // Speaking and writing use transparent, explainable estimates on the official
 // trait scales; Phase 2 swaps these estimators for calibrated AI models.
-import type { Item, ItemOf, Skill, TaskCode } from '../data/types';
-import { TASK } from '../data/taskTypes';
+import type { Exam, Item, ItemOf, Skill, TaskCode } from '../data/types';
+import { examOf, metaFor, TASK } from '../data/taskTypes';
 import type { RecordingResult } from './speech';
 import { ACADEMIC, COMPLEX, DISCOURSE, grammarCheck, type GrammarIssue } from './grammar';
 import { spellCheck, type SpellIssue } from './spell';
@@ -98,7 +98,7 @@ const POLITE = /\b(please|could|would|i was wondering|would it be possible|sorry
 export function scoreSpeaking(item: Item, resp: SpokenResponse): ScoreResult {
   const t = resp.transcript.trim();
   const n = words(t).length;
-  const meta = TASK[item.task];
+  const meta = metaFor(item);
   const responseSec = meta.responseSec ?? 40;
   const fb: string[] = [];
   const stats: Record<string, string | number> = { words: n };
@@ -111,6 +111,8 @@ export function scoreSpeaking(item: Item, resp: SpokenResponse): ScoreResult {
     fb.push(ok ? 'Correct answer.' : `Accepted answers: ${it.answers.join(' / ')}.`);
     return finish('asq', [{ name: 'Vocabulary', score: ok ? 1 : 0, max: 1 }], false, fb, { stats });
   }
+
+  if (item.task.startsWith('cs')) return scoreCelpipSpeaking(item as ItemOf<'cs1'>, t, n, resp.rec, responseSec, stats);
 
   let content: Trait;
   let accuracy: number | null = null;
@@ -162,6 +164,9 @@ export function scoreSpeaking(item: Item, resp: SpokenResponse): ScoreResult {
   if (fl.wpm && fl.wpm < 95) fb.push('Speak a little faster, in phrases rather than word by word (target 120–150 words/min).');
   if (fl.wpm > 175) fb.push('You are speaking very fast — slow slightly so every word is clear.');
 
+  if (item.task === 'rts' && examOf(item) === 'pte-core') {
+    content = { ...content, score: Math.round((content.score / 5) * 3), max: 3 };
+  }
   const traits: Trait[] = [content, { name: 'Oral fluency', score: fl.score, max: 5, note: fl.note }, { name: 'Pronunciation', score: pr.score, max: 5, note: pr.note }];
   if (n === 0) traits.forEach((x) => (x.score = 0));
   return finish(item.task, traits, true, fb, { ...extra, stats }, contentFrac);
@@ -192,26 +197,31 @@ function spellingScore(issues: SpellIssue[] | null) {
 
 export async function scoreWriting(item: Item, text: string): Promise<ScoreResult> {
   const n = wordCount(text);
-  const g = grammarCheck(text);
+  const g = grammarCheck(text, { email: item.task === 'wem' || item.task === 'cw1' });
   const sp = await spellCheck(text, allowWords(item));
   const vr = vocabRange(text);
   const fb: string[] = [];
   const stats: Record<string, string | number> = { words: n, sentences: sentenceCount(text) };
 
+  if (item.task === 'wem') return scoreEmail(item as ItemOf<'wem'>, text, g, sp, vr, stats);
+  if (item.task === 'cw1' || item.task === 'cw2') return scoreCelpipWriting(item as ItemOf<'cw1'>, text, g, sp, vr, stats);
+  const core = examOf(item) === 'pte-core';
+
   if (item.task === 'swt') {
     const it = item as ItemOf<'swt'>;
     const sentences = sentenceCount(text);
-    const formOk = n >= 5 && n <= 75 && sentences === 1;
+    const formOk = core ? n >= 5 && n <= 60 && sentences === 1 : n >= 5 && n <= 75 && sentences === 1;
+    const formScore = !formOk ? 0 : core ? (n >= 25 && n <= 50 ? 2 : 1) : 1;
     const cov = keyPointCoverage(text, it.keyPoints);
     const hits = cov.filter((c) => c.hit).length;
     const content = hits >= Math.ceil(cov.length * 0.75) ? 2 : hits >= 1 ? 1 : 0;
     const copied = copyRatio(text, it.passage);
     stats['copied phrases'] = `${Math.round(copied * 100)}%`;
-    if (!formOk) fb.push(sentences !== 1 ? 'Form: your summary must be ONE sentence (one full stop at the end).' : 'Form: your summary must be 5–75 words.');
+    if (!formOk) fb.push(sentences !== 1 ? 'Form: your summary must be ONE sentence (one full stop at the end).' : core ? 'Form: write 25–50 words (5–60 still scores).' : 'Form: your summary must be 5–75 words.');
     if (copied > 0.7) fb.push('Much of your sentence is copied in long chunks — paraphrase key ideas to show vocabulary.');
     const traits: Trait[] = [
       { name: 'Content', score: content, max: 2, note: `${hits} of ${cov.length} key points.` },
-      { name: 'Form', score: formOk ? 1 : 0, max: 1, note: `${n} words, ${sentences} sentence(s).` },
+      { name: 'Form', score: formScore, max: core ? 2 : 1, note: `${n} words, ${sentences} sentence(s).` },
       { name: 'Grammar', score: grammarScore(g, n), max: 2, note: g.length ? `${g.length} issue(s) flagged.` : 'No issues flagged.' },
       { name: 'Vocabulary', score: vr.acad >= 3 || copied < 0.5 ? 2 : 1, max: 2, note: `${vr.acad} academic word(s).` },
     ];
@@ -221,12 +231,12 @@ export async function scoreWriting(item: Item, text: string): Promise<ScoreResul
 
   if (item.task === 'sst') {
     const it = item as ItemOf<'sst'>;
-    const form = n >= 50 && n <= 70 ? 2 : n >= 40 && n <= 100 ? 1 : 0;
+    const form = core ? (n >= 20 && n <= 30 ? 2 : n >= 5 && n <= 40 ? 1 : 0) : n >= 50 && n <= 70 ? 2 : n >= 40 && n <= 100 ? 1 : 0;
     const cov = keyPointCoverage(text, it.keyPoints);
     const hits = cov.filter((c) => c.hit).length;
     const content = hits >= Math.ceil(cov.length * 0.75) ? 2 : hits >= 1 ? 1 : 0;
     const s = spellingScore(sp);
-    if (form < 2) fb.push(`Form: aim for 50–70 words (you wrote ${n}).`);
+    if (form < 2) fb.push(`Form: aim for ${core ? '20–30' : '50–70'} words (you wrote ${n}).`);
     const traits: Trait[] = [
       { name: 'Content', score: content, max: 2, note: `${hits} of ${cov.length} key points.` },
       { name: 'Form', score: form, max: 2, note: `${n} words.` },
@@ -290,6 +300,122 @@ function copyRatio(resp: string, source: string): number {
   return r.length ? copied / r.length : 0;
 }
 
+// =============================================================== PTE Core: Write Email
+type VR = { ttr: number; acad: number };
+const GREETING = /^(dear|hi|hello|good (morning|afternoon|evening)|to whom it may concern)\b/i;
+const SIGNOFF = /\b(regards|sincerely|best wishes|best|cheers|thanks|thank you|yours truly|warm regards|kind regards|take care|see you)\b[,!.]?\s*\n?\s*[A-Z]?[a-z]*\s*$/i;
+
+function scoreEmail(it: ItemOf<'wem'>, text: string, g: GrammarIssue[], sp: SpellIssue[] | null, vr: VR, stats: Record<string, string | number>): ScoreResult {
+  const n = wordCount(text);
+  const fb: string[] = [];
+  const form = n >= 50 && n <= 120 ? 2 : (n >= 30 && n <= 49) || (n >= 121 && n <= 140) ? 1 : 0;
+  const cov = keyPointCoverage(text, [...it.points, ...it.keyPoints], 0.34);
+  const pts = cov.slice(0, it.points.length).filter((c) => c.hit).length;
+  const content = pts >= 3 ? 3 : pts;
+  const lines = text.trim().split(/\n/).map((l) => l.trim()).filter(Boolean);
+  const greet = GREETING.test(lines[0] ?? '');
+  const sign = SIGNOFF.test(lines.slice(-3).join('\n'));
+  const conventions = (greet ? 1 : 0) + (sign ? 1 : 0);
+  const paras = text.split(/\n\s*\n|\n/).filter((p) => p.trim()).length;
+  const organization = paras >= 4 ? 2 : paras >= 2 ? 1 : 0;
+  const s = spellingScore(sp);
+  stats['points covered'] = `${pts}/${it.points.length}`;
+  if (!greet) fb.push('Open with a greeting that fits the reader ("Dear Mr Patel," / "Hi Sam,").');
+  if (!sign) fb.push('Close with a sign-off and your name ("Kind regards, Ana").');
+  if (pts < 3) fb.push('Address every bullet point: each one carries Content marks.');
+  if (form < 2) fb.push(`Form: write 50–120 words (aim for 80–120). You wrote ${n}.`);
+  const traits: Trait[] = [
+    { name: 'Content', score: content, max: 3, note: `${pts} of ${it.points.length} required points addressed.` },
+    { name: 'Email conventions', score: conventions, max: 2, note: `${greet ? 'Greeting ✓' : 'No greeting'} · ${sign ? 'sign-off ✓' : 'no sign-off'}.` },
+    { name: 'Form', score: form, max: 2, note: `${n} words.` },
+    { name: 'Organization', score: organization, max: 2, note: `${paras} paragraph(s)/line block(s).` },
+    { name: 'Vocabulary range', score: vr.ttr > 0.6 && n > 60 ? 2 : vr.ttr > 0.45 ? 1 : 0, max: 2, note: `Lexical variety ${Math.round(vr.ttr * 100)}%.` },
+    { name: 'Grammar', score: grammarScore(g, n), max: 2, note: g.length ? `${g.length} issue(s) flagged.` : 'No issues flagged.' },
+    { name: 'Spelling', score: s.score, max: 2, note: s.note },
+  ];
+  if (form === 0 || content === 0) { traits.forEach((x) => (x.score = 0)); if (n) fb.unshift('PTE rule: when Form or Content scores 0, the whole email scores 0.'); }
+  return finish('wem', traits, true, fb, { coverage: cov.slice(0, it.points.length), grammar: g, spelling: sp ?? undefined, stats });
+}
+
+// =============================================================== CELPIP writing & speaking
+/** CELPIP performance dimensions, each estimated on 0–5; the level is derived from the total. */
+function celpipResult(task: TaskCode, dims: Trait[], fb: string[], extra: Partial<ScoreResult>): ScoreResult {
+  const r = finish(task, dims, true, fb, extra);
+  r.stats = { ...(r.stats ?? {}), 'estimated level': `CELPIP ${toCelpip(r.fraction)}` };
+  return r;
+}
+
+function scoreCelpipWriting(it: ItemOf<'cw1'>, text: string, g: GrammarIssue[], sp: SpellIssue[] | null, vr: VR, stats: Record<string, string | number>): ScoreResult {
+  const n = wordCount(text);
+  const fb: string[] = [];
+  const cov = keyPointCoverage(text, it.points?.length ? [...it.points, ...it.keyPoints] : it.keyPoints, 0.34);
+  const covFrac = cov.length ? cov.filter((c) => c.hit).length / cov.length : 0;
+  const paras = text.split(/\n\s*\n/).filter((p) => p.trim()).length;
+  const markers = new Set((text.match(DISCOURSE) ?? []).map((m) => m.toLowerCase())).size;
+  const errs = g.length + (sp?.length ?? 0);
+  const errRate = errs / Math.max(1, n / 100);
+  let choiceOk = true;
+  if (it.task === 'cw2') {
+    const first = text.split(/[.!?]/)[0]?.toLowerCase() ?? '';
+    choiceOk = /option\s*[ab]\b|\b(prefer|choose|support|would rather|i think|i believe)\b/.test(first);
+    if (!choiceOk) fb.push('State your choice (Option A or B) clearly in the first sentence.');
+  }
+  const lenOk = n >= 150 && n <= 200 ? 1 : n >= 120 && n <= 230 ? 0.6 : n >= 80 ? 0.3 : 0;
+  const content = clamp(Math.round(5 * (0.6 * covFrac + 0.2 * clamp(markers / 4, 0, 1) + 0.2 * clamp(paras / 4, 0, 1))), 0, 5);
+  const vocab = clamp(Math.round(5 * (0.6 * clamp((vr.ttr - 0.35) / 0.35, 0, 1) + 0.4 * clamp(vr.acad / 8, 0, 1))), 0, 5);
+  const readability = clamp(Math.round(5 - errRate * 1.2 - (paras < 3 ? 1 : 0)), 0, 5);
+  const fulfil = clamp(Math.round(5 * (0.5 * lenOk + 0.3 * covFrac + 0.2 * (choiceOk ? 1 : 0))), 0, 5);
+  if (n < 150 || n > 200) fb.push(`Task Fulfillment: write 150–200 words (you wrote ${n}).`);
+  if (paras < 3) fb.push('Readability: use clear paragraphs separated by a blank line.');
+  if (markers < 3) fb.push('Coherence: connect ideas with linking words (Firstly, However, As a result, For example).');
+  if (it.task === 'cw1' && !GREETING.test(text.trim())) fb.push('Start the email with an appropriate greeting.');
+  stats.paragraphs = paras;
+  stats['linking devices'] = markers;
+  const dims: Trait[] = [
+    { name: 'Content/Coherence', score: content, max: 5, note: `${cov.filter((c) => c.hit).length} of ${cov.length} expected ideas; ${markers} linking devices.` },
+    { name: 'Vocabulary', score: vocab, max: 5, note: `Lexical variety ${Math.round(vr.ttr * 100)}%, ${vr.acad} precise/academic words.` },
+    { name: 'Readability', score: readability, max: 5, note: `${errs} grammar/spelling issue(s); ${paras} paragraph(s).` },
+    { name: 'Task Fulfillment', score: fulfil, max: 5, note: `${n} words${it.task === 'cw2' ? `, choice ${choiceOk ? 'stated' : 'unclear'}` : ''}.` },
+  ];
+  if (n === 0) dims.forEach((d) => (d.score = 0));
+  return celpipResult(it.task, dims, fb, { coverage: cov, grammar: g, spelling: sp ?? undefined, stats });
+}
+
+function scoreCelpipSpeaking(it: ItemOf<'cs1'>, t: string, n: number, rec: RecordingResult | undefined, responseSec: number, stats: Record<string, string | number>): ScoreResult {
+  const fb: string[] = [];
+  const cov = keyPointCoverage(t, it.keyPoints);
+  const covFrac = cov.length ? cov.filter((c) => c.hit).length / cov.length : 0;
+  const target = responseSec * 2.1; // words for a full, fluent response
+  const lenFrac = clamp(n / target, 0, 1);
+  const vr = vocabRange(t);
+  const fl = fluency(n, rec, responseSec);
+  const pr = pronunciation(rec, null, fl.score);
+  const markers = new Set((t.match(DISCOURSE) ?? []).map((m) => m.toLowerCase())).size;
+  const content = clamp(Math.round(5 * (0.65 * covFrac + 0.2 * lenFrac + 0.15 * clamp(markers / 3, 0, 1))), 0, 5);
+  const vocab = clamp(Math.round(5 * (0.7 * clamp((vr.ttr - 0.3) / 0.35, 0, 1) + 0.3 * lenFrac)), 0, 5);
+  const listen = clamp(Math.round((fl.score + pr.score) / 2), 0, 5);
+  const fulfil = clamp(Math.round(5 * (0.5 * lenFrac + 0.5 * covFrac)), 0, 5);
+  stats['speech rate'] = fl.wpm ? `${Math.round(fl.wpm)} wpm` : '—';
+  if (n < target * 0.6) fb.push(`Use more of your ${responseSec} seconds: a full answer is roughly ${Math.round(target * 0.8)}–${Math.round(target)} words.`);
+  if (markers < 2) fb.push('Organise your answer with signposts: "First...", "Another reason...", "So overall...".');
+  if (fl.longPauses > 1) fb.push('Long pauses reduce Listenability. Keep talking in phrases, even if you simplify.');
+  const dims: Trait[] = [
+    { name: 'Content/Coherence', score: content, max: 5, note: `${cov.filter((c) => c.hit).length} of ${cov.length} expected ideas.` },
+    { name: 'Vocabulary', score: vocab, max: 5, note: `Lexical variety ${Math.round(vr.ttr * 100)}%.` },
+    { name: 'Listenability', score: listen, max: 5, note: `${fl.note} ${pr.note}` },
+    { name: 'Task Fulfillment', score: fulfil, max: 5, note: `${n} words in a ${responseSec}-second task.` },
+  ];
+  if (n === 0) dims.forEach((d) => (d.score = 0));
+  return celpipResult(it.task, dims, fb, { coverage: cov, stats });
+}
+
+/** CELPIP listening/reading set: one point per question. */
+export function scoreCelpipSet(task: TaskCode, chosen: (number | null)[], answers: number[]): ScoreResult {
+  const right = answers.filter((a, i) => chosen[i] === a).length;
+  const r = finish(task, [{ name: 'Correct answers', score: right, max: answers.length }], false, []);
+  return r;
+}
+
 // =============================================================== Objective tasks
 const exact = (task: TaskCode, score: number, max: number, feedback: string[] = [], extra: Partial<ScoreResult> = {}) =>
   finish(task, [{ name: 'Score', score, max }], false, feedback, extra);
@@ -341,8 +467,12 @@ export function scoreWFD(sentence: string, typed: string): ScoreResult {
 // =============================================================== Aggregation
 /** Convert 0–1 performance to the PTE 10–90 scale. */
 export const toScale = (f: number) => Math.round(10 + 80 * clamp(f, 0, 1));
+/** Convert 0–1 performance to a CELPIP level (1–12). Practice estimate only. */
+export const toCelpip = (f: number) => clamp(Math.round(1 + 11 * clamp(f, 0, 1)), 1, 12);
+export const toExamScale = (exam: Exam, f: number) => (exam === 'celpip' ? toCelpip(f) : toScale(f));
+export const scoreLabel = (exam: Exam, f: number) => (exam === 'celpip' ? `L${toCelpip(f)}` : String(toScale(f)));
 
-export function skillScores(results: { task: TaskCode; result: ScoreResult }[]): Record<Skill, number | null> {
+export function skillScores(results: { task: TaskCode; result: ScoreResult }[], exam: Exam = 'pte-a'): Record<Skill, number | null> {
   const acc: Record<Skill, { s: number; w: number }> = { speaking: { s: 0, w: 0 }, writing: { s: 0, w: 0 }, reading: { s: 0, w: 0 }, listening: { s: 0, w: 0 } };
   for (const { task, result } of results) {
     const contrib = TASK[task].contributes;
@@ -354,6 +484,6 @@ export function skillScores(results: { task: TaskCode; result: ScoreResult }[]):
     }
   }
   const out = {} as Record<Skill, number | null>;
-  (Object.keys(acc) as Skill[]).forEach((k) => (out[k] = acc[k].w ? toScale(acc[k].s / acc[k].w) : null));
+  (Object.keys(acc) as Skill[]).forEach((k) => (out[k] = acc[k].w ? toExamScale(exam, acc[k].s / acc[k].w) : null));
   return out;
 }

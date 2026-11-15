@@ -10,13 +10,27 @@ function niceMax(v: number) {
 }
 
 export function Chart({ spec }: { spec: ChartSpec }) {
+  if (spec.kind === 'table') {
+    // HTML (not SVG) so long cell text wraps cleanly
+    return (
+      <figure style={{ margin: 0, maxWidth: 720 }}>
+        <div className="card flat" style={{ padding: 0, overflowX: 'auto' }}>
+          <div style={{ textAlign: 'center', fontWeight: 700, color: 'var(--navy)', padding: '12px 12px 8px' }}>{spec.title}</div>
+          <table className="t" style={{ fontSize: 13.5 }}>
+            <thead><tr>{spec.columns.map((c) => <th key={c} style={{ background: 'var(--navy)', color: '#fff' }}>{c}</th>)}</tr></thead>
+            <tbody>{spec.rows.map((r, i) => <tr key={i}>{r.map((cell, j) => <td key={j} style={{ fontWeight: j === 0 ? 600 : 400 }}>{cell}</td>)}</tr>)}</tbody>
+          </table>
+        </div>
+      </figure>
+    );
+  }
   return (
     <figure style={{ margin: 0, maxWidth: W }}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={spec.title} style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 12 }}>
         <text x={W / 2} y={28} textAnchor="middle" fontSize="16" fontWeight="700" fill="#0b2545">{spec.title}</text>
         {spec.kind === 'bar' || spec.kind === 'line' ? <XY spec={spec} /> : null}
         {spec.kind === 'pie' ? <Pie spec={spec} /> : null}
-        {spec.kind === 'table' ? <Table spec={spec} /> : null}
+        
         {spec.kind === 'process' ? <Process spec={spec} /> : null}
       </svg>
     </figure>
@@ -113,29 +127,6 @@ function Pie({ spec }: { spec: Extract<ChartSpec, { kind: 'pie' }> }) {
           <text x="22" y="12">{s.label} — {s.value}{sfx}</text>
         </g>
       ))}
-    </g>
-  );
-}
-
-function Table({ spec }: { spec: Extract<ChartSpec, { kind: 'table' }> }) {
-  const T = 56, rowH = Math.min(40, (H - T - 20) / (spec.rows.length + 1));
-  const colW = (W - 60) / spec.columns.length;
-  return (
-    <g fontSize="14" fill="#1b2636">
-      {spec.columns.map((c, i) => (
-        <g key={c}>
-          <rect x={30 + i * colW} y={T} width={colW} height={rowH} fill="#0b2545" />
-          <text x={30 + i * colW + colW / 2} y={T + rowH / 2 + 5} textAnchor="middle" fill="#fff" fontWeight="700">{c}</text>
-        </g>
-      ))}
-      {spec.rows.map((r, ri) =>
-        r.map((cell, ci) => (
-          <g key={`${ri}-${ci}`}>
-            <rect x={30 + ci * colW} y={T + rowH * (ri + 1)} width={colW} height={rowH} fill={ri % 2 ? '#f4f6f9' : '#fff'} stroke="#e2e7ef" />
-            <text x={30 + ci * colW + colW / 2} y={T + rowH * (ri + 1) + rowH / 2 + 5} textAnchor="middle" fontWeight={ci === 0 ? 600 : 400}>{cell}</text>
-          </g>
-        )),
-      )}
     </g>
   );
 }

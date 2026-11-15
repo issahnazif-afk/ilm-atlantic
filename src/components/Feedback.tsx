@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Item } from '../data/types';
-import { TASK } from '../data/taskTypes';
+import { metaFor } from '../data/taskTypes';
 import type { ScoreResult } from '../lib/scoring';
 import { getAudio, updateAttempt, type Attempt } from '../lib/store';
 import { Bar, ScoreRing } from './ui';
@@ -32,7 +32,7 @@ export function useAudioUrl(key?: string) {
 
 export function Feedback({ item, attempt }: { item: Item; attempt: Attempt }) {
   const r = attempt.result;
-  const meta = TASK[item.task];
+  const meta = metaFor(item);
   const audioUrl = useAudioUrl(attempt.audioKey);
   const pct = Math.round(r.fraction * 100);
   const review = attempt.review;
@@ -129,9 +129,10 @@ export function Feedback({ item, attempt }: { item: Item; attempt: Attempt }) {
 
 function Reveal({ item }: { item: Item }) {
   const blocks: { title: string; body: string }[] = [];
-  switch (item.task) {
-    case 'di': case 'rl': case 'sgd': case 'rts': case 'swt': case 'sst': case 'we':
-      if ('modelAnswer' in item) blocks.push({ title: 'Model answer (C1)', body: item.modelAnswer });
+  if ('modelAnswer' in item) blocks.push({ title: item.exam === 'celpip' ? 'Model answer (CELPIP 10+)' : 'Model answer (C1)', body: item.modelAnswer });
+  if ('audio' in item && item.audio) {
+    const secs = item.audio;
+    blocks.push({ title: 'Transcript', body: secs.map((sec, k) => (secs.length > 1 ? `Section ${k + 1}\n` : '') + sec.map((t) => `${t.speaker.name}: ${t.text}`).join('\n')).join('\n\n') });
   }
   if (item.task === 'rl' || item.task === 'sst') blocks.push({ title: 'Transcript', body: item.transcript });
   if (item.task === 'sgd') blocks.push({ title: 'Transcript', body: item.turns.map((t) => `${t.speaker.name}: ${t.text}`).join('\n\n') });

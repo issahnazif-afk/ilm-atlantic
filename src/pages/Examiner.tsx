@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { TASK } from '../data/taskTypes';
 import { itemById } from '../data/items';
 import type { Item } from '../data/types';
-import { href } from '../lib/router';
+import { href, itemPath } from '../lib/router';
 import { getAttempts, updateAttempt, useStore, type Attempt } from '../lib/store';
 import { Feedback, useAudioUrl } from '../components/Feedback';
 import { Chart } from '../components/Chart';
+import { SceneView } from '../components/Scene';
 
 /**
  * Examiner console. In the prototype it lists review requests from this browser.
@@ -105,6 +106,14 @@ export function PromptSummary({ item }: { item: Item }) {
     case 'hcs': case 'smw': return <><p className="small">{item.transcript}</p><ol type="A">{item.options.map((o, i) => <li key={i}>{o}</li>)}</ol></>;
     case 'lfib': return <p>{item.transcript.replace(/\[\[([^\]]+)\]\]/g, '[$1]')}</p>;
     case 'hiw': return <p>{item.transcript}</p>;
+    case 'wem': return <><p>{item.situation}</p><ul>{item.points.map((x) => <li key={x}>{x}</li>)}</ul></>;
+    case 'cw1': case 'cw2': return <><p style={{ whiteSpace: 'pre-wrap' }}>{item.prompt}</p>{item.points && <ul>{item.points.map((x) => <li key={x}>{x}</li>)}</ul>}{item.choices && <ol type="A">{item.choices.map((x) => <li key={x}>{x}</li>)}</ol>}</>;
+    case 'cs1': case 'cs2': case 'cs3': case 'cs4': case 'cs5': case 'cs6': case 'cs7': case 'cs8':
+      return <><p style={{ whiteSpace: 'pre-wrap' }}>{item.prompt}</p>{item.scene && <SceneView scene={item.scene} />}{item.choices && <ul>{item.choices.map((c) => <li key={c.title}><b>{c.title}</b>: {c.details.join('; ')}</li>)}</ul>}</>;
+    case 'cl1': case 'cl2': case 'cl3': case 'cl4': case 'cl5': case 'cl6':
+      return <div className="small">{(item.audio ?? []).flat().map((t, i) => <p key={i}><b>{t.speaker.name}:</b> {t.text}</p>)}</div>;
+    case 'cr1': case 'cr2': case 'cr3': case 'cr4':
+      return <div className="small">{item.diagram && <Chart spec={item.diagram} />}{item.passage && <p style={{ whiteSpace: 'pre-wrap' }}>{item.passage}</p>}{item.paragraphs?.map((x, i) => <p key={i}><b>{'ABCD'[i]}.</b> {x}</p>)}</div>;
   }
 }
 
@@ -116,7 +125,7 @@ export function ReviewAttempt({ id }: { id: string }) {
   return (
     <div className="container page">
       <div className="crumbs">{a.mockId ? <a href={href(`report/${a.mockId}`)}>Score report</a> : <a href={href('dashboard')}>Dashboard</a>} / {TASK[item.task].name} / {item.title}</div>
-      <div className="row spread"><h1 style={{ marginBottom: 0 }}>{item.title}</h1><a className="btn ghost" href={href(`practice/${item.task}/${item.id}`)}>Practise this item again</a></div>
+      <div className="row spread"><h1 style={{ marginBottom: 0 }}>{item.title}</h1><a className="btn ghost" href={href(itemPath(item))}>Practise this item again</a></div>
       <details className="box" style={{ marginTop: 14 }}><summary>Question</summary><div style={{ marginTop: 10 }}><PromptSummary item={item} /></div></details>
       <Feedback item={item} attempt={a} />
     </div>

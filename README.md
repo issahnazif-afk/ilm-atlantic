@@ -1,56 +1,62 @@
-# Ilm Atlantic — PTE made easy (prototype v0.1)
+# Ilm Atlantic: PTE & CELPIP made easy (prototype v0.2)
 
-A PTE Academic preparation platform with examiner-grade feedback. Long-term: one home for Canada's English tests (PTE Academic → PTE Core → CELPIP-General).
+Exam preparation for **PTE Academic**, **PTE Core** and **CELPIP-General**, with examiner-grade feedback.
+Live site: https://issahnazif-afk.github.io/ilm-atlantic/
 
 ## Run it
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm run build      # static site in dist/ (GitHub Pages-ready, hash routing, relative paths)
+npm run dev                             # http://localhost:5173
+npm run build                           # static site in dist/ (GitHub Pages, hash routing)
+npx tsx scripts/validate-items.ts       # validate the whole item bank
+npx tsx scripts/answer-balance.ts       # check correct-answer position spread
 ```
 
-Use **Chrome or Edge** for speaking tasks (built-in speech recognition). Other browsers record audio and ask the learner to type what they said.
+Pushing to `main` builds and deploys to GitHub Pages (`.github/workflows/deploy.yml`).
+Use **Chrome or Edge** for speaking tasks (built-in speech recognition).
 
-## What's in the prototype
+## Content (all original)
 
-| Area | Status |
-|---|---|
-| All 22 PTE Academic task types (incl. 2025: Summarize Group Discussion, Respond to a Situation) | ✅ realistic players with official timings |
-| 113 original practice items | ✅ `src/data/items/*.ts` |
-| Exact marking for reading/listening (negative marking, ROP pairs, WFD per word) | ✅ `src/lib/scoring.ts` |
-| Speaking: recording, 3-s silence cut-off, pause & speech-rate analysis, transcription, content alignment / key-point coverage | ✅ estimates on official 0–5 trait scales |
-| Writing: form rules, key-point coverage, rule-based grammar, Hunspell spelling, vocab/structure markers | ✅ estimates on official trait scales |
-| Dashboard: 10–90 skill estimates vs target, streak, recommendations | ✅ |
-| Mock tests (mini full, sectional, sprint) + score report with enabling skills | ✅ |
-| Examiner console: review queue, trait marking, comments shown to learner | ✅ (local queue) |
-| Accounts, cloud sync, payments | ⏭ Phase 2 |
+| Exam | Task types | Items | Questions |
+|---|---|---|---|
+| PTE Academic (2025 format) | 22 | 349 | 349 |
+| PTE Core | 19 (incl. Write Email) | 308 | 308 |
+| CELPIP-General | 20 (L1–6, R1–4, W1–2, S1–8) | 120 sets/tasks = **6 complete practice tests** | ≈ 516 |
+| **Total** | | **777** | **≈ 1,170** |
+
+Plus:
+- **Vocabulary trainer**: NGSL (2,809 words) and NAWL (958 words), CC BY-SA 4.0. See `public/vocab/*.json` for attribution.
+- **Study resources**: 12 original strategy guides and 60+ curated links to free official materials (Pearson, Paragon/CELPIP, IRCC, CCLB) and open textbooks.
+
+### Content policy
+- Every question is original, written to the published formats in `docs/content-brief.md`.
+- Pearson, Longman and Paragon/Prometric materials are used only as format and rubric references, and are **linked, never copied**.
+- No recalled or "prediction" exam questions.
+- Research and licences: `docs/research/exam-formats-and-resources.md`.
+- Correct answers are spread evenly across option positions by a fixed-seed shuffle (`src/data/balance.ts`).
 
 ## Architecture
 
 ```
 src/
-  data/types.ts         item schema (the content contract)
-  data/taskTypes.ts     task metadata: timings, instructions, scoring, skill weights, tips
-  data/items/           original item bank (speaking, writing-reading, listening)
-  lib/speech.ts         TTS prompts (multi-accent voices), Recorder (MediaRecorder + VAD + ASR)
-  lib/scoring.ts        all scorers + 10–90 aggregation
-  lib/grammar.ts        rule-based grammar checks, academic word list
-  lib/spell.ts          lazy Hunspell dictionary (public/dict)
-  lib/store.ts          localStorage + IndexedDB (swap for Supabase in Phase 2)
-  components/tasks/     one player per task family
-  pages/                Landing, Dashboard, Library, Practice, Mock, Report, Examiner, Scoring
+  data/types.ts           item schema, the content contract
+  data/taskTypes.ts       task metadata per exam: timings, instructions, scoring, tips, PTE Core overrides
+  data/items/*.ts         item bank, loaded automatically (import.meta.glob)
+  data/resources.ts       resource directory + original strategy guides
+  lib/scoring.ts          PTE traits, PTE Core Write Email, CELPIP dimensions, exact marking
+  lib/speech.ts           TTS prompts (multi-accent), Recorder (MediaRecorder + VAD + ASR)
+  lib/store.ts            localStorage + IndexedDB (to be replaced by Supabase in Phase 2)
+  components/tasks/       players: Speaking, Writing, Choice, Gap tasks, CELPIP sets
+  pages/                  Landing, Dashboard, Library, Practice, Mock, Report, Resources, Vocabulary, Scoring, Examiner
+scripts/                  validate-items, answer-balance, list-items, score-sample
 ```
 
-## Content policy
+## Phase 2
 
-All items are original, written to the published task formats. Pearson/Longman books (Official Guide, Practice Tests Plus, Testbuilder, Score Guide) are used **only as format and rubric references** — never copied into the site. No recalled or "predicted" exam questions.
+1. Supabase auth, Postgres and storage; Stripe in CAD.
+2. Calibrated AI scoring (phoneme-level pronunciation plus an LLM marker trained on examiner marks).
+3. Human-recorded or neural-TTS audio for listening items.
+4. Code-split the item bank per exam (bundle is currently ~450 KB gzipped).
 
-## Phase 2 (next)
-
-1. Supabase auth + Postgres + storage (replace `lib/store.ts`), Stripe in CAD.
-2. Server-side scoring: phoneme-level pronunciation assessment + LLM writing/speaking marker calibrated on examiner-marked responses (the examiner console already collects these).
-3. Human-recorded audio for listening items; full-length mocks; item authoring CMS for examiners.
-4. PTE Core, then CELPIP-General with CLB-band reporting.
-
-Not affiliated with Pearson. PTE is a trademark of its owner.
+Not affiliated with Pearson, Paragon Testing Enterprises or Prometric. PTE and CELPIP are trademarks of their owners.

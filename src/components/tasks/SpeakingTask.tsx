@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Item, ItemOf } from '../../data/types';
-import { TASK } from '../../data/taskTypes';
+import { metaFor } from '../../data/taskTypes';
 import { AudioPrompt } from '../AudioPrompt';
 import { Chart } from '../Chart';
+import { SceneView } from '../Scene';
 import { fmt, Shell, useCountdown } from '../ui';
 import { beep, Recorder, recognitionSupported, recordingSupported, type RecordingResult, type SpeechChunk } from '../../lib/speech';
 import { scoreSpeaking } from '../../lib/scoring';
@@ -17,12 +18,13 @@ function audioFor(item: Item): SpeechChunk[] | null {
     case 'rl': return [{ text: item.transcript, speaker: item.speaker }];
     case 'sgd': return item.turns.map((t) => ({ text: t.text, speaker: t.speaker }));
     case 'rts': return [{ text: item.situation, speaker: item.speaker }];
+    case 'cs1': case 'cs2': case 'cs3': case 'cs4': case 'cs5': case 'cs6': case 'cs7': case 'cs8': return null;
     default: return null;
   }
 }
 
 export function SpeakingTask({ item, mode, onDone, nav }: TaskProps) {
-  const meta = TASK[item.task];
+  const meta = metaFor(item);
   const audio = audioFor(item);
   const [phase, setPhase] = useState<Phase>(audio ? 'audio' : 'prep');
   const [level, setLevel] = useState(0);
@@ -154,6 +156,25 @@ function Prompt({ item, phase }: { item: Item; phase: Phase }) {
   if (item.task === 'ra') return <div className="passage">{(item as ItemOf<'ra'>).text}</div>;
   if (item.task === 'di') return <Chart spec={(item as ItemOf<'di'>).chart} />;
   if (item.task === 'rts') return <div className="passage card flat" style={{ background: '#f7f9fc' }}>{(item as ItemOf<'rts'>).situation}</div>;
+  if (item.task.startsWith('cs')) {
+    const it = item as ItemOf<'cs1'>;
+    return (
+      <div className="stack">
+        <div className="passage card flat" style={{ background: '#f7f9fc', whiteSpace: 'pre-wrap' }}>{it.prompt}</div>
+        {it.scene && <SceneView scene={it.scene} />}
+        {it.choices && (
+          <div className="grid g2">
+            {it.choices.map((c, i) => (
+              <div key={i} className="card flat">
+                <b style={{ color: 'var(--navy)' }}>Option {'AB'[i]}: {c.title}</b>
+                <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>{c.details.map((d) => <li key={d} className="small">{d}</li>)}</ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
   if (item.task === 'rl' || item.task === 'sgd')
     return (
       <div className="row muted small" style={{ gap: 14 }}>

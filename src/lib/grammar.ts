@@ -34,7 +34,7 @@ const RULES: Rule[] = [
   { rule: 'contraction', re: /\b(can't|won't|don't|doesn't|isn't|aren't|it's|didn't|shouldn't|wouldn't)\b/gi, message: (m) => `Avoid contractions in academic writing ("${m[1]}").` },
 ];
 
-export function grammarCheck(text: string): GrammarIssue[] {
+export function grammarCheck(text: string, opts: { email?: boolean } = {}): GrammarIssue[] {
   const out: GrammarIssue[] = [];
   for (const r of RULES) {
     r.re.lastIndex = 0;
@@ -50,7 +50,7 @@ export function grammarCheck(text: string): GrammarIssue[] {
   }
   const t = text.trim();
   if (t && /^[a-z]/.test(t)) out.push({ rule: 'capital', message: 'Start with a capital letter.', excerpt: t.slice(0, 24) + '…' });
-  if (t && !/[.!?]["')]?$/.test(t)) out.push({ rule: 'punctuation', message: 'End with a full stop.', excerpt: '…' + t.slice(-24) });
+  if (t && !opts.email && !/[.!?]["')]?$/.test(t)) out.push({ rule: 'punctuation', message: 'End with a full stop.', excerpt: '…' + t.slice(-24) });
   return out;
 }
 

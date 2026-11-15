@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ItemOf } from '../../data/types';
-import { TASK } from '../../data/taskTypes';
+import { metaFor } from '../../data/taskTypes';
 import { AudioPrompt } from '../AudioPrompt';
 import { fmt, Shell, useElapsed } from '../ui';
 import { scoreMultiple, scoreSingle } from '../../lib/scoring';
@@ -10,7 +10,7 @@ type C = ItemOf<'mcm' | 'mcs' | 'lmcm' | 'lmcs' | 'hcs' | 'smw'>;
 const L = 'ABCDEFG';
 
 export function ChoiceTask({ item, mode, onDone, nav }: TaskProps<C>) {
-  const meta = TASK[item.task];
+  const meta = metaFor(item);
   const multi = item.task === 'mcm' || item.task === 'lmcm';
   const listening = item.task !== 'mcm' && item.task !== 'mcs';
   const [sel, setSel] = useState<number[]>([]);

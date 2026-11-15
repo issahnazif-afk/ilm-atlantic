@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from 'react';
 import type { ItemOf } from '../../data/types';
-import { TASK } from '../../data/taskTypes';
+import { metaFor } from '../../data/taskTypes';
 import { AudioPrompt } from '../AudioPrompt';
 import { fmt, Shell, useElapsed } from '../ui';
 import { scoreBlanks, scoreHIW, scoreOrder, scoreWFD } from '../../lib/scoring';
@@ -17,7 +17,7 @@ function Submit({ done, onClick, disabled }: { done: boolean; onClick: () => voi
 
 // ------------------------------------------------ Reading & Writing FIB (dropdowns)
 export function RWFIBTask({ item, onDone, nav }: TaskProps<ItemOf<'rwfib'>>) {
-  const meta = TASK.rwfib;
+  const meta = metaFor(item);
   const [vals, setVals] = useState<string[]>(item.blanks.map(() => ''));
   const [done, setDone] = useState(false);
   const elapsed = useElapsed(!done);
@@ -59,7 +59,7 @@ export function RWFIBTask({ item, onDone, nav }: TaskProps<ItemOf<'rwfib'>>) {
 
 // ------------------------------------------------ Reading FIB (drag & drop, or tap-to-place)
 export function RFIBTask({ item, onDone, nav }: TaskProps<ItemOf<'rfib'>>) {
-  const meta = TASK.rfib;
+  const meta = metaFor(item);
   const bank = useMemo(() => shuffle([...item.answers, ...item.distractors], item.id.length * 7919), [item]);
   const [slots, setSlots] = useState<(string | null)[]>(item.answers.map(() => null));
   const [picked, setPicked] = useState<string | null>(null);
@@ -126,7 +126,7 @@ export function RFIBTask({ item, onDone, nav }: TaskProps<ItemOf<'rfib'>>) {
 
 // ------------------------------------------------ Re-order Paragraphs
 export function ROPTask({ item, onDone, nav }: TaskProps<ItemOf<'rop'>>) {
-  const meta = TASK.rop;
+  const meta = metaFor(item);
   const start = useMemo(() => {
     let s = shuffle(item.paragraphs.map((_, i) => i), item.id.length * 104729 + 3);
     if (s.every((v, i) => v === i)) s = [...s].reverse();
@@ -189,7 +189,7 @@ export function ROPTask({ item, onDone, nav }: TaskProps<ItemOf<'rop'>>) {
 
 // ------------------------------------------------ Listening FIB
 export function LFIBTask({ item, mode, onDone, nav }: TaskProps<ItemOf<'lfib'>>) {
-  const meta = TASK.lfib;
+  const meta = metaFor(item);
   const parts = item.transcript.split(/(\[\[[^\]]+\]\])/g);
   const answers = parts.filter((p) => p.startsWith('[[')).map((p) => p.slice(2, -2));
   const spoken = item.transcript.replace(/\[\[([^\]]+)\]\]/g, '$1');
@@ -233,7 +233,7 @@ export function LFIBTask({ item, mode, onDone, nav }: TaskProps<ItemOf<'lfib'>>)
 
 // ------------------------------------------------ Highlight Incorrect Words
 export function HIWTask({ item, mode, onDone, nav }: TaskProps<ItemOf<'hiw'>>) {
-  const meta = TASK.hiw;
+  const meta = metaFor(item);
   const tokens = item.transcript.split(' ');
   const changed = new Map(item.changes.map((c) => [c.index, c.shown]));
   const shown = tokens.map((t, i) => changed.get(i) ?? t);
@@ -272,7 +272,7 @@ export function HIWTask({ item, mode, onDone, nav }: TaskProps<ItemOf<'hiw'>>) {
 
 // ------------------------------------------------ Write From Dictation
 export function WFDTask({ item, onDone, nav }: TaskProps<ItemOf<'wfd'>>) {
-  const meta = TASK.wfd;
+  const meta = metaFor(item);
   const [val, setVal] = useState('');
   const [done, setDone] = useState(false);
   const elapsed = useElapsed(!done);

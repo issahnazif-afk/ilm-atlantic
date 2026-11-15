@@ -1,5 +1,5 @@
 import { TASKS } from '../data/taskTypes';
-import { href } from '../lib/router';
+import { href, taskPath } from '../lib/router';
 
 export function Scoring() {
   return (
@@ -32,7 +32,21 @@ export function Scoring() {
         </div>
       </div>
 
-      <h2 style={{ marginTop: 32 }}>Score contribution by task</h2>
+      <div className="card stack" style={{ marginTop: 20 }}>
+        <h3>CELPIP-General</h3>
+        <p className="muted" style={{ margin: 0 }}>
+          Listening and Reading questions are marked exactly (1 point each, 38 per component on a full test) and the share correct is converted to an estimated CELPIP level.
+          Writing and Speaking are estimated on CELPIP's four rating dimensions: <b>Content/Coherence</b>, <b>Vocabulary</b>, <b>Readability</b> (writing) or <b>Listenability</b> (speaking),
+          and <b>Task Fulfillment</b>. Each is rated 0–5 and combined into a level from 1 to 12. CELPIP levels 4–10+ map directly to the same CLB level for IRCC.
+        </p>
+        <h3>PTE Core</h3>
+        <p className="muted" style={{ margin: 0 }}>
+          PTE Core uses PTE's 10–90 scale and trait scoring, with its own rules: Summarize Written Text 25–50 words, Summarize Spoken Text 20–30 words,
+          Respond to a Situation rated on Appropriacy (0–3), and the Write Email task (Content, Email conventions, Form, Organization, Vocabulary, Grammar, Spelling).
+        </p>
+      </div>
+
+      <h2 style={{ marginTop: 32 }}>Score contribution by task (PTE)</h2>
       <p className="muted">PTE is integrated: many tasks count towards two skills. This prototype uses these weights to turn your practice into 10–90 skill estimates.</p>
       <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="t">
@@ -40,7 +54,7 @@ export function Scoring() {
           <tbody>
             {TASKS.map((t) => (
               <tr key={t.code}>
-                <td><a href={href(`practice/${t.code}`)}>{t.name}</a></td>
+                <td><a href={href(taskPath('pte-a', t.code))}>{t.name}</a></td>
                 {(['speaking', 'writing', 'reading', 'listening'] as const).map((s) => <td key={s}>{t.contributes[s] ? '●'.repeat(Math.round(t.contributes[s]! * 3)) : ''}</td>)}
                 <td>{t.aiScored ? <span className="pill gold">AI estimate</span> : <span className="pill green">Exact</span>}</td>
               </tr>

@@ -68,17 +68,18 @@ export function Bar({ value, color }: { value: number; color?: string }) {
   return <div className="bar"><i style={{ width: `${Math.max(0, Math.min(1, value)) * 100}%`, background: color }} /></div>;
 }
 
-export function SkillBars({ scores, target }: { scores: Record<Skill, number | null>; target?: number }) {
+export function SkillBars({ scores, target, scale = 'pte' }: { scores: Record<Skill, number | null>; target?: number; scale?: 'pte' | 'celpip' }) {
+  const lo = scale === 'celpip' ? 1 : 10, hi = scale === 'celpip' ? 12 : 90;
   return (
     <div className="stack" style={{ marginTop: 4 }}>
       {SKILLS.map((s) => {
         const v = scores[s.key];
         return (
           <div key={s.key}>
-            <div className="row spread small"><span className="row" style={{ gap: 8 }}><span className="skill-dot" style={{ background: s.color }} />{s.label}</span><b>{v ?? '—'}</b></div>
+            <div className="row spread small"><span className="row" style={{ gap: 8 }}><span className="skill-dot" style={{ background: s.color }} />{s.label}</span><b>{v === null ? '—' : scale === 'celpip' ? `L${v}` : v}</b></div>
             <div style={{ position: 'relative' }}>
-              <Bar value={v ? (v - 10) / 80 : 0} color={s.color} />
-              {target ? <span title={`Target ${target}`} style={{ position: 'absolute', top: -3, bottom: -3, width: 2, background: 'var(--navy)', left: `${((target - 10) / 80) * 100}%` }} /> : null}
+              <Bar value={v ? (v - lo) / (hi - lo) : 0} color={s.color} />
+              {target ? <span title={`Target ${target}`} style={{ position: 'absolute', top: -3, bottom: -3, width: 2, background: 'var(--navy)', left: `${((target - lo) / (hi - lo)) * 100}%` }} /> : null}
             </div>
           </div>
         );
@@ -89,6 +90,7 @@ export function SkillBars({ scores, target }: { scores: Record<Skill, number | n
 
 export function SkillPill({ task }: { task: TaskCode }) {
   const t = TASK[task];
+  if (!t) return null;
   const s = SKILLS.find((x) => x.key === t.section)!;
   return <span className="pill grey"><span className="skill-dot" style={{ background: s.color }} />{s.label}</span>;
 }

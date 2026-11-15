@@ -1,16 +1,16 @@
 import { useRef, useState } from 'react';
 import type { ItemOf } from '../../data/types';
-import { TASK } from '../../data/taskTypes';
+import { examOf, metaFor } from '../../data/taskTypes';
 import { AudioPrompt } from '../AudioPrompt';
 import { fmt, Shell, useCountdown } from '../ui';
 import { scoreWriting } from '../../lib/scoring';
 import { wordCount } from '../../lib/text';
 import type { TaskProps } from './types';
 
-type W = ItemOf<'swt' | 'we' | 'sst'>;
+type W = ItemOf<'swt' | 'we' | 'sst' | 'wem' | 'cw1' | 'cw2'>;
 
 export function WritingTask({ item, mode, onDone, nav }: TaskProps<W>) {
-  const meta = TASK[item.task];
+  const meta = metaFor(item);
   const [text, setText] = useState('');
   const [listening, setListening] = useState(item.task === 'sst');
   const [busy, setBusy] = useState(false);
@@ -29,7 +29,9 @@ export function WritingTask({ item, mode, onDone, nav }: TaskProps<W>) {
   };
   const left = useCountdown(limit, !listening && !done, submit);
   const n = wordCount(text);
-  const range = item.task === 'swt' ? [5, 75] : item.task === 'we' ? [200, 300] : [50, 70];
+  const core = examOf(item) === 'pte-core';
+  const range = item.task === 'swt' ? (core ? [25, 50] : [5, 75]) : item.task === 'we' ? [200, 300] : item.task === 'sst' ? (core ? [20, 30] : [50, 70])
+    : item.task === 'wem' ? [50, 120] : [150, 200];
   const inRange = n >= range[0] && n <= range[1];
 
   // PTE's editor offers Cut / Copy / Paste buttons and no spell-check.
@@ -56,6 +58,19 @@ export function WritingTask({ item, mode, onDone, nav }: TaskProps<W>) {
       <div className="stack">
         {item.task === 'swt' && <div className="passage">{item.passage.split(/\n\s*\n/).map((p, i) => <p key={i}>{p}</p>)}</div>}
         {item.task === 'we' && <div className="passage card flat" style={{ background: '#f7f9fc', fontWeight: 500 }}>{item.prompt}</div>}
+        {item.task === 'wem' && (
+          <div className="passage card flat" style={{ background: '#f7f9fc' }}>
+            <p style={{ marginTop: 0 }}>{item.situation}</p>
+            <ul style={{ margin: 0 }}>{item.points.map((p) => <li key={p}>{p}</li>)}</ul>
+          </div>
+        )}
+        {(item.task === 'cw1' || item.task === 'cw2') && (
+          <div className="passage card flat" style={{ background: '#f7f9fc' }}>
+            <p style={{ marginTop: 0, whiteSpace: 'pre-wrap' }}>{item.prompt}</p>
+            {item.points && <><p style={{ marginBottom: 4 }}>In your email, you should:</p><ul style={{ margin: 0 }}>{item.points.map((p) => <li key={p}>{p}</li>)}</ul></>}
+            {item.choices && <div className="grid g2" style={{ marginTop: 8 }}>{item.choices.map((c, i) => <div key={i} className="card flat"><b>Option {'AB'[i]}</b><br />{c}</div>)}</div>}
+          </div>
+        )}
         {item.task === 'sst' && (
           <AudioPrompt chunks={[{ text: item.transcript, speaker: item.speaker }]} allowReplay={false} delay={mode === 'exam' ? 7 : 3} onEnded={() => setListening(false)} label="Lecture" />
         )}
@@ -69,14 +84,14 @@ export function WritingTask({ item, mode, onDone, nav }: TaskProps<W>) {
           <textarea
             ref={ta}
             className="answer"
-            style={{ minHeight: item.task === 'we' ? 320 : 150 }}
+            style={{ minHeight: item.task === 'we' || item.task.startsWith('cw') ? 320 : item.task === 'wem' ? 220 : 150 }}
             spellCheck={false}
             autoCorrect="off"
             autoCapitalize="off"
             value={text}
             readOnly={done}
             onChange={(e) => setText(e.target.value)}
-            placeholder={item.task === 'we' ? 'Write your essay here. Separate paragraphs with a blank line.' : 'Type your response here.'}
+            placeholder={item.task === 'we' || item.task.startsWith('cw') ? 'Write your response here. Separate paragraphs with a blank line.' : item.task === 'wem' ? 'Dear ...,\n\n...\n\nKind regards,\n...' : 'Type your response here.'}
           />
           <div className="row spread small" style={{ marginTop: 4 }}>
             <span className={inRange ? '' : 'muted'} style={{ color: inRange ? 'var(--green)' : undefined, fontWeight: 600 }}>Word count: {n}</span>

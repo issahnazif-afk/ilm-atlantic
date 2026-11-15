@@ -1,9 +1,17 @@
-import type { Item, ItemOf, TaskCode } from '../types';
-import { speakingItems } from './speaking';
-import { writingReadingItems } from './writing-reading';
-import { listeningItems } from './listening';
+import type { Exam, Item, ItemOf, TaskCode } from '../types';
+import { balance } from '../balance';
 
-export const ITEMS: Item[] = [...speakingItems, ...writingReadingItems, ...listeningItems];
+// Every *.ts file in this folder exports one Item[] array; they are picked up automatically.
+const modules = import.meta.glob<Record<string, Item[]>>(['./*.ts', '!./index.ts'], { eager: true });
 
-export const itemsFor = <T extends TaskCode>(task: T) => ITEMS.filter((i) => i.task === task) as ItemOf<T>[];
-export const itemById = (id: string) => ITEMS.find((i) => i.id === id);
+export const ITEMS: Item[] = Object.keys(modules)
+  .sort()
+  .flatMap((k) => Object.values(modules[k]).filter(Array.isArray).flat())
+  .map(balance);
+
+const BY_ID = new Map(ITEMS.map((i) => [i.id, i]));
+
+export const itemsFor = <T extends TaskCode>(task: T, exam: Exam = 'pte-a') =>
+  ITEMS.filter((i) => i.task === task && (i.exam ?? 'pte-a') === exam).sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true })) as ItemOf<T>[];
+export const itemsForExam = (exam: Exam) => ITEMS.filter((i) => (i.exam ?? 'pte-a') === exam);
+export const itemById = (id: string) => BY_ID.get(id);

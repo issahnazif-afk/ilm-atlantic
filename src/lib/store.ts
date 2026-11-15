@@ -1,12 +1,14 @@
 // Prototype persistence: profile + attempts in localStorage, recordings in IndexedDB.
 // Phase 2 replaces this module with Supabase (same function signatures).
 import { useEffect, useState } from 'react';
-import type { Skill, TaskCode } from '../data/types';
+import type { Exam, Skill, TaskCode } from '../data/types';
 import type { ScoreResult } from './scoring';
 
 export interface Profile {
   name: string;
-  target: number;        // overall target, 10–90
+  exam: Exam;            // the exam the learner is preparing for
+  target: number;        // overall PTE target, 10–90
+  celpipTarget: number;  // CELPIP target level, 1–12
   examDate: string;      // yyyy-mm-dd or ''
   replayAudio: boolean;  // practice-mode convenience (exam mode never replays)
   voiceRate: number;     // TTS rate
@@ -24,6 +26,7 @@ export interface Attempt {
   id: string;
   itemId: string;
   task: TaskCode;
+  exam?: Exam;               // omitted = 'pte-a'
   at: number;
   mode: 'practice' | 'mock';
   mockId?: string;
@@ -36,6 +39,7 @@ export interface Attempt {
 export interface MockRun {
   id: string;
   kind: string;
+  exam?: Exam;
   startedAt: number;
   finishedAt?: number;
   attemptIds: string[];
@@ -61,7 +65,7 @@ function write(key: string, value: unknown) {
   window.dispatchEvent(new Event('ia-store'));
 }
 
-export const defaultProfile: Profile = { name: '', target: 65, examDate: '', replayAudio: true, voiceRate: 0.95 };
+export const defaultProfile: Profile = { name: '', exam: 'pte-a', celpipTarget: 9, target: 65, examDate: '', replayAudio: true, voiceRate: 0.95 };
 
 export const getProfile = () => ({ ...defaultProfile, ...read<Partial<Profile>>(K.profile, {}) });
 export const saveProfile = (p: Profile) => write(K.profile, p);

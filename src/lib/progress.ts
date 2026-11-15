@@ -1,5 +1,5 @@
-import type { Skill, TaskCode } from '../data/types';
-import { TASKS } from '../data/taskTypes';
+import type { Exam, Skill, TaskCode } from '../data/types';
+import { EXAM_TASKS, TASK } from '../data/taskTypes';
 import { itemsFor } from '../data/items';
 import { skillScores } from './scoring';
 import type { Attempt } from './store';
@@ -12,11 +12,15 @@ export function latestByItem(attempts: Attempt[]) {
 
 export interface TaskStat { task: TaskCode; total: number; done: number; avg: number | null; attempts: number }
 
-export function taskStats(attempts: Attempt[]): Record<TaskCode, TaskStat> {
+export const attemptExam = (a: Attempt): Exam => a.exam ?? 'pte-a';
+export const forExam = (attempts: Attempt[], exam: Exam) => attempts.filter((a) => attemptExam(a) === exam);
+
+export function taskStats(attempts: Attempt[], exam: Exam = 'pte-a'): Record<TaskCode, TaskStat> {
+  attempts = forExam(attempts, exam);
   const latest = latestByItem(attempts);
   const out = {} as Record<TaskCode, TaskStat>;
-  for (const t of TASKS) {
-    const items = itemsFor(t.code);
+  for (const t of EXAM_TASKS[exam].map((c) => TASK[c])) {
+    const items = itemsFor(t.code, exam);
     const ls = items.map((i) => latest.get(i.id)).filter(Boolean) as Attempt[];
     out[t.code] = {
       task: t.code,
@@ -30,9 +34,9 @@ export function taskStats(attempts: Attempt[]): Record<TaskCode, TaskStat> {
 }
 
 /** Estimated skill scores from each item's most recent attempt. */
-export function estimatedSkills(attempts: Attempt[]) {
-  const latest = [...latestByItem(attempts).values()];
-  return skillScores(latest.map((a) => ({ task: a.task, result: a.result })));
+export function estimatedSkills(attempts: Attempt[], exam: Exam = 'pte-a') {
+  const latest = [...latestByItem(forExam(attempts, exam)).values()];
+  return skillScores(latest.map((a) => ({ task: a.task, result: a.result })), exam);
 }
 
 export function overall(s: Record<Skill, number | null>) {
@@ -41,10 +45,10 @@ export function overall(s: Record<Skill, number | null>) {
 }
 
 /** Suggest tasks: untried high-weight tasks first, then the weakest averages. */
-export function recommendations(attempts: Attempt[], n = 4): TaskCode[] {
-  const st = taskStats(attempts);
-  const weight = (c: TaskCode) => Object.values(TASKS.find((t) => t.code === c)!.contributes).reduce((a, b) => a + (b ?? 0), 0);
-  return TASKS.map((t) => t.code)
+export function recommendations(attempts: Attempt[], exam: Exam = 'pte-a', n = 4): TaskCode[] {
+  const st = taskStats(attempts, exam);
+  const weight = (c: TaskCode) => Object.values(TASK[c].contributes).reduce((a, b) => a + (b ?? 0), 0);
+  return [...EXAM_TASKS[exam]]
     .sort((a, b) => {
       const A = st[a], B = st[b];
       const sa = A.avg === null ? -1 + 0.1 * -weight(a) : A.avg - (A.done < A.total ? 0.05 : 0);

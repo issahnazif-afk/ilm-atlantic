@@ -34,8 +34,15 @@ export async function spellCheck(text: string, allow: Iterable<string> = []): Pr
   const ok = new Set([...allow].map((w) => w.toLowerCase()));
   const seen = new Set<string>();
   const out: SpellIssue[] = [];
-  for (const raw of text.match(/[A-Za-z][A-Za-z'’-]*/g) ?? []) {
+  const re = /[A-Za-z][A-Za-z'’-]*/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const raw = m[0];
     const w = raw.replace(/[’]/g, "'").replace(/['-]+$/, '');
+    // Capitalised words mid-sentence are treated as names (Amina, Saskatoon) and not flagged.
+    const before = text.slice(0, m.index).replace(/[ \t]+$/, '');
+    const sentenceStart = !before || /[.!?:\n]$/.test(before);
+    if (/^[A-Z]/.test(w) && !sentenceStart) continue;
     const lw = w.toLowerCase();
     if (seen.has(lw) || ok.has(lw) || w.length < 2) continue;
     seen.add(lw);

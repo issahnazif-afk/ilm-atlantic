@@ -3,6 +3,7 @@
 // Audio prompts are generated in the browser with text-to-speech from the `text`/`transcript` fields.
 
 export type Skill = 'speaking' | 'writing' | 'reading' | 'listening';
+export type Exam = 'pte-a' | 'pte-core' | 'celpip';
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export type TaskCode =
@@ -13,13 +14,22 @@ export type TaskCode =
   // Reading
   | 'rwfib' | 'mcm' | 'rop' | 'rfib' | 'mcs'
   // Listening
-  | 'sst' | 'lmcm' | 'lfib' | 'hcs' | 'lmcs' | 'smw' | 'hiw' | 'wfd';
+  | 'sst' | 'lmcm' | 'lfib' | 'hcs' | 'lmcs' | 'smw' | 'hiw' | 'wfd'
+  // PTE Core only
+  | 'wem'
+  // CELPIP-General: listening parts 1–6, reading parts 1–4, writing tasks 1–2, speaking tasks 1–8
+  | 'cl1' | 'cl2' | 'cl3' | 'cl4' | 'cl5' | 'cl6'
+  | 'cr1' | 'cr2' | 'cr3' | 'cr4'
+  | 'cw1' | 'cw2'
+  | 'cs1' | 'cs2' | 'cs3' | 'cs4' | 'cs5' | 'cs6' | 'cs7' | 'cs8';
 
 interface Base<T extends TaskCode> {
   id: string;            // e.g. "ra-001" — unique, prefix = task code
   task: T;
   title: string;         // short label shown in lists, e.g. "Coral reef recovery"
   difficulty: Difficulty;
+  exam?: Exam;           // omitted = 'pte-a'. PTE Core items use 'pte-core'; ids must be globally unique
+  testNo?: number;       // CELPIP: which practice test (1–6) this set belongs to
   topic: string;         // e.g. "Environment", "Health", "Technology", "History", "Economics", "Education", "Arts", "Society", "Science"
 }
 
@@ -143,12 +153,64 @@ export interface HighlightIncorrectWords extends Base<'hiw'> {
 }
 export interface WriteFromDictation extends Base<'wfd'> { sentence: string; speaker: Speaker } // 8–14 words
 
+// ---------- PTE Core ----------
+export interface WriteEmail extends Base<'wem'> {
+  situation: string;     // 40–70 words: who you write to, why; ends with the 3 points to cover
+  points: string[];      // the 3 bullet points the email must address
+  keyPoints: string[];   // content an examiner expects (3–5)
+  modelAnswer: string;   // 90–120 words: greeting, paragraphs, sign-off (newline-separated)
+}
+
+// ---------- CELPIP ----------
+/** One multiple-choice / dropdown question inside a CELPIP set. */
+export interface CelpipQuestion {
+  prompt: string;        // question stem; for dropdown blanks use the sentence with "_____"
+  options: string[];     // 3–4 options (Reading Part 3 uses ["A","B","C","D","E"], E = not given)
+  answer: number;        // index into options
+  explanation: string;   // 1–2 sentences: why right, why the tempting option is wrong
+  section?: number;      // Listening Part 1 only: which audio section (0,1,2) the question follows
+}
+/** An illustrated scene built from emoji on a backdrop (Speaking Tasks 3, 4, 8). */
+export interface Scene {
+  backdrop: 'park' | 'street' | 'kitchen' | 'living-room' | 'office' | 'store' | 'beach' | 'campsite' | 'classroom' | 'airport' | 'restaurant' | 'backyard' | 'winter';
+  elements: { e: string; x: number; y: number; size?: number; label?: string }[]; // x,y in % (0–100); size in px (default 44)
+  caption: string;       // one-line alt text describing the scene
+}
+/** Listening & reading sets: context + passage/audio + several questions. */
+export interface CelpipSet<T extends 'cl1' | 'cl2' | 'cl3' | 'cl4' | 'cl5' | 'cl6' | 'cr1' | 'cr2' | 'cr3' | 'cr4'> extends Base<T> {
+  context: string;       // one-line situation shown before the audio/text
+  audio?: { speaker: Speaker; text: string }[][];  // LISTENING: sections of dialogue turns (Part 1 has 3 sections; others 1)
+  passage?: string;      // READING Parts 1, 2, 4: the main text (letter, email, article)
+  paragraphs?: string[]; // READING Part 3: paragraphs A–D
+  diagram?: ChartSpec;   // READING Part 2: the diagram / schedule / comparison table
+  reply?: string;        // READING Parts 1, 2, 4: a second text with {{n}} blanks; {{n}} = questions[n] (rendered as dropdowns)
+  questions: CelpipQuestion[];
+}
+export type CelpipListening = CelpipSet<'cl1'> | CelpipSet<'cl2'> | CelpipSet<'cl3'> | CelpipSet<'cl4'> | CelpipSet<'cl5'> | CelpipSet<'cl6'>;
+export type CelpipReading = CelpipSet<'cr1'> | CelpipSet<'cr2'> | CelpipSet<'cr3'> | CelpipSet<'cr4'>;
+export interface CelpipWriting extends Base<'cw1' | 'cw2'> {
+  prompt: string;        // the task text
+  points?: string[];     // cw1: the 3 things the email must do
+  choices?: [string, string]; // cw2: Option A / Option B
+  keyPoints: string[];
+  modelAnswer: string;   // 160–200 words
+}
+export interface CelpipSpeaking extends Base<'cs1' | 'cs2' | 'cs3' | 'cs4' | 'cs5' | 'cs6' | 'cs7' | 'cs8'> {
+  prompt: string;        // the task question as shown on screen
+  scene?: Scene;         // cs3, cs4, cs8
+  choices?: { title: string; details: string[] }[]; // cs5 (two options), cs6 (two choices)
+  keyPoints: string[];   // 3–5 ideas a strong response covers
+  modelAnswer: string;   // natural spoken response sized to the response time
+}
+
 export type Item =
   | ReadAloud | RepeatSentence | AnswerShortQuestion | DescribeImage | RetellLecture
   | SummarizeGroupDiscussion | RespondToSituation
   | SummarizeWrittenText | WriteEssay
   | ReadingWritingFIB | ReadingMCMultiple | ReorderParagraphs | ReadingFIB | ReadingMCSingle
   | SummarizeSpokenText | ListeningMCMultiple | ListeningFIB | HighlightCorrectSummary
-  | ListeningMCSingle | SelectMissingWord | HighlightIncorrectWords | WriteFromDictation;
+  | ListeningMCSingle | SelectMissingWord | HighlightIncorrectWords | WriteFromDictation
+  | WriteEmail | CelpipListening | CelpipReading | CelpipWriting | CelpipSpeaking;
 
-export type ItemOf<T extends TaskCode> = Extract<Item, { task: T }>;
+/** The item type(s) whose `task` can be T (works for interfaces covering several task codes). */
+export type ItemOf<T extends TaskCode> = Item extends infer I ? (I extends { task: infer K } ? ([T] extends [K] ? I : T extends K ? I : never) : never) : never;
