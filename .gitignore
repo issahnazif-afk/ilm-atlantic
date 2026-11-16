@@ -1,3 +1,7 @@
 node_modules
 dist
 .DS_Store
+
+# VoxCPM2 voice cast: local paths to the reference takes (kept on the recording machine)
+scripts/voice/cast.json
+__pycache__/

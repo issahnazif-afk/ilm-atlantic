@@ -116,6 +116,7 @@ export function CelpipSetTask({ item, mode, onDone, nav }: TaskProps<Set>) {
           {!done && (
             <AudioPrompt
               key={section}
+              clip={`${item.id}-s${section}`}
               chunks={(sections[section] ?? []).map((t) => ({ text: t.text, speaker: t.speaker }))}
               showSpeaker
               delay={mode === 'exam' ? 3 : 2}

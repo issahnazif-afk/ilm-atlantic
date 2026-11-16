@@ -72,7 +72,7 @@ export function WritingTask({ item, mode, onDone, nav }: TaskProps<W>) {
           </div>
         )}
         {item.task === 'sst' && (
-          <AudioPrompt chunks={[{ text: item.transcript, speaker: item.speaker }]} allowReplay={false} delay={mode === 'exam' ? 7 : 3} onEnded={() => setListening(false)} label="Lecture" />
+          <AudioPrompt clip={item.id} chunks={[{ text: item.transcript, speaker: item.speaker }]} allowReplay={false} delay={mode === 'exam' ? 7 : 3} onEnded={() => setListening(false)} label="Lecture" />
         )}
         {item.task === 'sst' && listening && <p className="small muted">Take notes while you listen. The writing timer starts when the audio ends.</p>}
         <div>

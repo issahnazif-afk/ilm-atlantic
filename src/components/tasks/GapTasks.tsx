@@ -204,7 +204,7 @@ export function LFIBTask({ item, mode, onDone, nav }: TaskProps<ItemOf<'lfib'>>)
   return (
     <Shell title={meta.name} sub={item.title} timer={fmt(elapsed)} instruction={meta.instruction} left={nav} right={<Submit done={done} onClick={submit} />}>
       <div className="stack">
-        <AudioPrompt chunks={[{ text: spoken, speaker: item.speaker }]} delay={mode === 'exam' ? 7 : 3} />
+        <AudioPrompt clip={item.id} chunks={[{ text: spoken, speaker: item.speaker }]} delay={mode === 'exam' ? 7 : 3} />
         <div className="passage">
           {parts.map((p, i) => {
             if (!p.startsWith('[[')) return <Fragment key={i}>{p}</Fragment>;
@@ -250,7 +250,7 @@ export function HIWTask({ item, mode, onDone, nav }: TaskProps<ItemOf<'hiw'>>) {
   return (
     <Shell title={meta.name} sub={item.title} timer={fmt(elapsed)} instruction={meta.instruction} left={nav} right={<Submit done={done} onClick={submit} />}>
       <div className="stack">
-        <AudioPrompt chunks={[{ text: item.transcript, speaker: item.speaker }]} delay={mode === 'exam' ? 10 : 3} />
+        <AudioPrompt clip={item.id} chunks={[{ text: item.transcript, speaker: item.speaker }]} delay={mode === 'exam' ? 10 : 3} />
         <div className="passage">
           {shown.map((w, i) => {
             const isChanged = changed.has(i);
@@ -283,7 +283,7 @@ export function WFDTask({ item, onDone, nav }: TaskProps<ItemOf<'wfd'>>) {
   return (
     <Shell title={meta.name} sub={item.title} timer={fmt(elapsed)} instruction={meta.instruction} left={nav} right={<Submit done={done} onClick={submit} />}>
       <div className="stack">
-        <AudioPrompt chunks={[{ text: item.sentence, speaker: item.speaker }]} delay={3} />
+        <AudioPrompt clip={item.id} chunks={[{ text: item.sentence, speaker: item.speaker }]} delay={3} />
         <input
           className="text"
           style={{ width: '100%', fontSize: 16, padding: '12px 14px' }}

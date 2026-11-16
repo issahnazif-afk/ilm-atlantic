@@ -125,6 +125,7 @@ export function SpeakingTask({ item, mode, onDone, nav }: TaskProps) {
         <Prompt item={item} phase={phase} />
         {audio && (
           <AudioPrompt
+            clip={item.id}
             chunks={audio}
             label={item.task === 'sgd' ? 'Group discussion' : item.task === 'rts' ? 'Situation' : 'Audio'}
             showSpeaker={item.task === 'sgd'}

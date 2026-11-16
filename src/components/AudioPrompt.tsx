@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { speak, type Playback, type SpeechChunk } from '../lib/speech';
 import { getProfile } from '../lib/store';
+import { findClip, playClip } from '../lib/audioBank';
 
 type State = 'waiting' | 'playing' | 'done';
 
 /**
  * PTE-style audio player: "Beginning in N seconds" → "Playing" → "Completed".
- * Audio is synthesised from the transcript with the browser's voices.
+ * Plays the pre-generated natural recording for `clip` when one exists, otherwise synthesises
+ * the transcript with the browser's voices.
  */
 export function AudioPrompt({
-  chunks, delay = 3, allowReplay = false, onEnded, onStart, label = 'Audio', showSpeaker = false,
+  chunks, clip, delay = 3, allowReplay = false, onEnded, onStart, label = 'Audio', showSpeaker = false,
 }: {
-  chunks: SpeechChunk[]; delay?: number; allowReplay?: boolean; onEnded?: () => void; onStart?: () => void; label?: string; showSpeaker?: boolean;
+  chunks: SpeechChunk[]; clip?: string; delay?: number; allowReplay?: boolean; onEnded?: () => void; onStart?: () => void; label?: string; showSpeaker?: boolean;
 }) {
   const [state, setState] = useState<State>('waiting');
   const [count, setCount] = useState(delay);
@@ -24,19 +26,32 @@ export function AudioPrompt({
   const started = useRef(onStart);
   started.current = onStart;
 
-  const play = () => {
+  const [natural, setNatural] = useState(false);
+  useEffect(() => { findClip(clip).then((c) => setNatural(!!c)); }, [clip]);
+
+  const finish = (p: Playback) => {
+    if (pb.current !== p) return;
+    setProgress(1);
+    setState('done');
+    ended.current?.();
+  };
+  const playTts = () => {
+    const p = speak(chunks, getProfile().voiceRate, (f, ci) => { setProgress(f); setSpeakerIdx(ci); });
+    pb.current = p;
+    p.done.then(() => finish(p));
+  };
+  const play = async () => {
     pb.current?.cancel();
     setState('playing');
     setProgress(0);
     started.current?.();
-    const p = speak(chunks, getProfile().voiceRate, (f, ci) => { setProgress(f); setSpeakerIdx(ci); });
+    const c = await findClip(clip);
+    if (!c) return playTts();
+    const p = playClip(c, getProfile().voiceRate, (f, ti) => { setProgress(f); setSpeakerIdx(ti); });
     pb.current = p;
-    p.done.then(() => {
-      if (pb.current !== p) return;
-      setProgress(1);
-      setState('done');
-      ended.current?.();
-    });
+    // if the file cannot play (offline, blocked), fall back to the browser voice
+    p.failed.then((bad) => { if (bad && pb.current === p) { setNatural(false); playTts(); } });
+    p.done.then(() => finish(p));
   };
 
   useEffect(() => {
@@ -56,7 +71,7 @@ export function AudioPrompt({
   const sp = chunks[speakerIdx]?.speaker;
   return (
     <div className="status-box">
-      <div className="label">{label}</div>
+      <div className="label row spread"><span>{label}</span>{natural && <span className="pill grey" title="Recorded with a natural AI voice (VoxCPM2), not a real person.">AI voice</span>}</div>
       <div className="state">
         {unsupported ? 'Audio is not supported in this browser' :
           state === 'waiting' ? `Beginning in ${count} second${count === 1 ? '' : 's'}` :

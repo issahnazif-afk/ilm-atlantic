@@ -44,7 +44,7 @@ export function ChoiceTask({ item, mode, onDone, nav }: TaskProps<C>) {
     >
       <div className={listening ? 'stack' : 'grid g2'} style={{ alignItems: 'start' }}>
         {listening ? (
-          <AudioPrompt chunks={[{ text: audioText, speaker: item.speaker }]} allowReplay={false} onEnded={() => setAudioDone(true)} delay={mode === 'exam' ? 5 : 3} />
+          <AudioPrompt clip={item.id} chunks={[{ text: audioText, speaker: item.speaker }]} allowReplay={false} onEnded={() => setAudioDone(true)} delay={mode === 'exam' ? 5 : 3} />
         ) : (
           <div className="passage" style={{ fontSize: 15 }}>{'passage' in item ? item.passage.split(/\n\s*\n/).map((p, i) => <p key={i}>{p}</p>) : null}</div>
         )}
